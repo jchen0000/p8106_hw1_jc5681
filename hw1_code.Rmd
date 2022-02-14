@@ -1,0 +1,34 @@
+---
+title: "hw1_code"
+author: "Jiaqi Chen"
+date: "2/13/2022"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(FNN)
+library(caret)
+```
+
+(a) Fit a linear model using least squares on the training data. Is there any potential
+disadvantage of this model?
+```{r}
+housing_test = read.csv("./housing_test.csv")
+housing_training = read.csv("./housing_training.csv")
+```
+
+```{r}
+vsSplits <- createDataPartition(y = trainData$Sale_Price,
+                                times = 2,
+                                p = 0.8,
+                                groups = 5,
+                                list = FALSE)
+
+head(vsSplits)
+```
+
+
+
