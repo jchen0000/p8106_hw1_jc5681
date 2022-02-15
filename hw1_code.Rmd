@@ -2,33 +2,82 @@
 title: "hw1_code"
 author: "Jiaqi Chen"
 date: "2/13/2022"
-output: html_document
+output: pdf_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ```{r}
-library(FNN)
-library(caret)
+library(RNHANES)
+library(tidyverse)
+library(summarytools)
+library(leaps)
+library(corrplot)
+library(glmnet)
 ```
 
-(a) Fit a linear model using least squares on the training data. Is there any potential
-disadvantage of this model?
+# (a) 
+## Import and clean data
 ```{r}
-housing_test = read.csv("./housing_test.csv")
-housing_training = read.csv("./housing_training.csv")
+housing_test = read.csv("./housing_test.csv") %>% 
+  janitor::clean_names()
+
+housing_training = read.csv("./housing_training.csv") %>% 
+  janitor::clean_names()
+```
+
+Summary statistics of the predictors and the response:
+```{r}
+st_options(plain.ascii = FALSE,       
+           style = "rmarkdown", 
+           dfSummary.silent = TRUE,        
+           footnote = NA,          
+           subtitle.emphasis = FALSE)      
+
+dfSummary(housing_training)
+```
+
+## Fit a linear model using least squares on the training data
+```{r}
+fit1 <- lm(sale_price ~., data = housing_training)
+```
+
+## Potential disadvantage of this model
+```{r}
+cor_df=
+  housing_training %>%
+  dplyr::select(-sale_price & -overall_qual & -kitchen_qual & -fireplace_qu & -exter_qual) 
+
+cor_df=apply(cor_df, 2, as.numeric)
+
+corrplot(cor(cor_df), method = 'number')
+```
+
+This linear model has multiple potential disadvantages:
+* There are too many factors to consider.
+* Some of these factors have correlations between each other, shown as above correlation plot. For example, the correlation between `Total rooms above grade (TotRms_AbvGrd)` and `Above grade (ground) living area square feet (Gr_Liv_Area)` is as high as 0.8.
+
+
+# (b)
+
+```{r}
+x = model.matrix(sale_price ~ ., housing_training)
+
+y = as.matrix(housing_training$sale_price)
+
+cv.lasso <- cv.glmnet(x, y,
+                      alpha = 1,
+                      lambda = exp(seq(11, -1, length = 100)))
+
+cv.lasso$lambda.1se
 ```
 
 ```{r}
-vsSplits <- createDataPartition(y = trainData$Sale_Price,
-                                times = 2,
-                                p = 0.8,
-                                groups = 5,
-                                list = FALSE)
-
-head(vsSplits)
+plot(cv.lasso)
 ```
 
-
+```{r}
+plot_glmnet(cv.lasso$glmnet.fit)
+```
 
