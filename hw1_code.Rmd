@@ -15,6 +15,9 @@ library(summarytools)
 library(leaps)
 library(corrplot)
 library(glmnet)
+library(caret)
+library(plotmo)
+library(ISLR)
 ```
 
 # (a) 
@@ -80,4 +83,25 @@ plot(cv.lasso)
 ```{r}
 plot_glmnet(cv.lasso$glmnet.fit)
 ```
+
+```{r}
+predict(cv.lasso, s = "lambda.1se", type = "coefficients")
+```
+
+```{r}
+head(predict(cv.lasso, s = "lambda.1se", type = "coefficients"))
+```
+
+There are 25 predictors included in this model.
+
+(c)
+```{r}
+enet.fit <- train(x, y,
+                  method = "glmnet",
+                  tuneGrid = expand.grid(alpha = seq(0, 1, length = 21),lambda = exp(seq(2, -2, length = 50))),trControl = ctrl1)
+
+enet.fit$bestTune
+```
+
+
 
