@@ -1,0 +1,19 @@
+---
+title: "draft"
+author: "Jiaqi Chen"
+date: "2/22/2022"
+output: html_document
+---
+
+(b)
+```{r}
+# define x and y value
+x = model.matrix(sale_price ~ ., housing_training)
+y = as.matrix(housing_training$sale_price)
+
+cv.lasso <- cv.glmnet(x, y,
+                      alpha = 1,
+                      lambda = exp(seq(11, -1, length = 100)))
+
+cv.lasso$lambda.1se
+```

@@ -18,6 +18,7 @@ library(glmnet)
 library(caret)
 library(plotmo)
 library(ISLR)
+library(pls)
 ```
 
 # (a) 
@@ -30,21 +31,37 @@ housing_training = read.csv("./housing_training.csv") %>%
   janitor::clean_names()
 ```
 
-Summary statistics of the predictors and the response:
 ```{r}
 st_options(plain.ascii = FALSE,       
            style = "rmarkdown", 
            dfSummary.silent = TRUE,        
            footnote = NA,          
            subtitle.emphasis = FALSE)      
-
-dfSummary(housing_training)
 ```
 
 ## Fit a linear model using least squares on the training data
 ```{r}
-fit1 <- lm(sale_price ~., data = housing_training)
+set.seed(1)
+
+ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+
+training2 <- model.matrix(sale_price ~., data = housing_training)[ ,-1]
+test2 <- model.matrix(sale_price ~., data = housing_test)[ ,-1]
+
+# matrix of predictors (glmnet uses input matrix)
+x <- training2
+# vector of response
+y <- housing_training$sale_price
+y2 <- housing_test$sale_price
+
+lm.fit <- train(x, y, method = "lm", trControl = ctrl1)
+
+pred1 <- predict(lm.fit, newdata = test2)
+# test error
+test_error1 = mean((pred1 - y2)^2)
 ```
+
+The test error for least square model is `r test_error1`.
 
 ## Potential disadvantage of this model
 ```{r}
@@ -54,29 +71,22 @@ cor_df=
 
 cor_df=apply(cor_df, 2, as.numeric)
 
-corrplot(cor(cor_df), method = 'number')
+corrplot::corrplot(cor(cor_df), method = 'number')
 ```
 
 This linear model has multiple potential disadvantages:
 * There are too many factors to consider.
 * Some of these factors have correlations between each other, shown as above correlation plot. For example, the correlation between `Total rooms above grade (TotRms_AbvGrd)` and `Above grade (ground) living area square feet (Gr_Liv_Area)` is as high as 0.8.
 
-
 # (b)
 
 ```{r}
-x = model.matrix(sale_price ~ ., housing_training)
-
-y = as.matrix(housing_training$sale_price)
-
 cv.lasso <- cv.glmnet(x, y,
                       alpha = 1,
                       lambda = exp(seq(11, -1, length = 100)))
 
 cv.lasso$lambda.1se
-```
 
-```{r}
 plot(cv.lasso)
 ```
 
@@ -85,23 +95,72 @@ plot_glmnet(cv.lasso$glmnet.fit)
 ```
 
 ```{r}
-predict(cv.lasso, s = "lambda.1se", type = "coefficients")
+pred <- predict(cv.lasso, newx = test2, s = "lambda.1se", type = "response")
+
+test_error2 = mean((pred - y2)^2)
+
 ```
 
-```{r}
-head(predict(cv.lasso, s = "lambda.1se", type = "coefficients"))
-```
+There are `r cv.lasso$nzero[cv.lasso$index[2]]` predictors included in this model. The test error is `r test_error2`.
 
-There are 25 predictors included in this model.
-
-(c)
+# (c)
 ```{r}
 enet.fit <- train(x, y,
                   method = "glmnet",
-                  tuneGrid = expand.grid(alpha = seq(0, 1, length = 21),lambda = exp(seq(2, -2, length = 50))),trControl = ctrl1)
+                  tuneGrid = expand.grid(alpha = seq(0.05, 1, length = 21),
+                                         lambda = exp(seq(5, -5, length = 150))), 
+                  trControl = ctrl1)
 
-enet.fit$bestTune
+parameter2 = enet.fit$bestTune
+
+myCol<- rainbow(25)
+myPar <- list(superpose.symbol = list(col = myCol),
+                    superpose.line = list(col = myCol))
+
+plot(enet.fit, par.settings = myPar)
+
+coef(enet.fit$finalModel, enet.fit$bestTune$lambda)
+
+enet.pred <- predict(enet.fit, newdata = test2)
+# test error
+test_error3 = mean((enet.pred - y2)^2)
 ```
+
+Elastic net mixing parameter alpha is `r parameter2[1]`, lambda is `r parameter2[2]`. Test error is `r test_error3`.
+
+# (d)
+```{r}
+set.seed(2)
+
+pls.mod <- plsr(sale_price~., data = housing_training, scale = TRUE, validation = "CV")
+
+summary(pls.mod)
+```
+
+
+```{r}
+validationplot(pls.mod, val.type="MSEP", legendpos = "topright")
+
+cv.mse <- RMSEP(pls.mod)
+ncomp.cv <- which.min(cv.mse$val[1,,])-1
+ncomp.cv
+```
+
+```{r}
+predy2.pls <- predict(pls.mod, newdata = test2,
+ncomp = ncomp.cv)
+# test MSE
+test_error4 = mean((y2 - predy2.pls)^2)
+```
+
+Test error is `r test_error4`. There are 8 components included in my model.
+
+
+# (e)
+Combining all calculations above, test error for linear model is `r test_error1`; test error for lasso model is `r test_error2`; test error for elastic net model is `r test_error3`; test error for partial least squares model is `r test_error4`. The test error of lasso model is the smallest, so I will choose lasso model for predicting the response.
+
+
+
 
 
 
